@@ -1,0 +1,17 @@
+ПРИМЕРЫ АНИМАЦИЙ И РАМОК
+
+Codrops — Effects for Card Stacks (интерактивные варианты смены стопки):
+https://tympanus.net/Development/CardStackEffects/
+
+Codrops — Image Stack Entrance Animations (появление стопки, демо и исходники):
+https://tympanus.net/codrops/2024/04/10/image-stack-entrance-animations/
+
+Stacking Cards — CSS scroll-driven demo:
+https://scroll-driven-animations.style/demos/stacking-cards/css/
+
+Devices.css — устройства из CSS, MIT:
+https://devicescss.xyz/
+https://github.com/picturepan2/devices.css
+
+В демо: собственная CSS-анимация падения карточки сверху; сторонний JS анимаций не используется.
+Рамки iPhone и MacBook — Devices.css. Экраны — снимки нашего рабочего HTML-демо.
