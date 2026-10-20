@@ -8,7 +8,7 @@
 
 GitHub Pages: https://savden.github.io/RussMarket_AI_Maket/
 
-После push в `main` workflow **Publish GitHub Pages** проверяет JavaScript, собирает автономный HTML и публикует папку `_site`. Состояние публикации видно во вкладке **Actions**. Для Pages выбран источник **GitHub Actions**.
+После push в `main` workflow **Publish GitHub Pages** проверяет JavaScript, собирает автономный HTML и публикует папку `_site`. Состояние публикации видно во вкладке **Actions**. Для первого запуска в **Settings → Pages → Build and deployment → Source** нужно выбрать **GitHub Actions**. Шаг настройки в задаче сборки использует `pages: read`; публикация получает `pages: write` только в задаче `deploy`.
 
 ## Где править
 
