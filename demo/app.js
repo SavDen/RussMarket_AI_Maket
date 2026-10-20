@@ -139,22 +139,69 @@ renderService();
 
 // A prepared visual metaphor: collecting the sources opens the existing solution demo.
 const noiseScene=$('#matching-panel'),noiseButton=$('#collect-context');
-let noiseBusy=false,noiseCollected=false,noiseGeneration=0,noiseAnimations=[];
+let noiseBusy=false,noiseCollected=false,noiseGeneration=0,noiseAnimations=[],noiseNavigating=false,noiseScrollCancel=null;
 const noiseButtonInitial=noiseButton.innerHTML;
 function resetNoiseScene(){
  noiseGeneration++;
+ if(noiseScrollCancel)noiseScrollCancel();
  noiseAnimations.forEach(a=>a.cancel());noiseAnimations=[];
- noiseBusy=false;noiseCollected=false;
- noiseScene.classList.remove('is-collecting','is-collected');
+ $$('.noise-burst',noiseScene).forEach(layer=>layer.remove());
+ noiseBusy=false;noiseCollected=false;noiseNavigating=false;
+ noiseScene.classList.remove('is-collecting','is-collected','is-finishing');
  noiseScene.removeAttribute('aria-busy');
  $$('.noise-node',noiseScene).forEach(n=>n.removeAttribute('aria-hidden'));
  noiseButton.disabled=false;noiseButton.innerHTML=noiseButtonInitial;
  document.body.classList.remove('collecting-context');
  $('#noise-status').textContent='Статусы отдельно. Уточнения отдельно. Полная картина — у сотрудника в голове.';
 }
+async function finishContextBurst(){
+ const center=$('.noise-center',noiseScene),size=center.getBoundingClientRect().width;
+ const layer=document.createElement('div');layer.className='noise-burst';layer.setAttribute('aria-hidden','true');center.append(layer);
+ const burst=[];
+ for(let i=0;i<3;i++){
+  const wave=document.createElement('span');wave.className='noise-burst-wave';layer.append(wave);
+  burst.push(wave.animate([{transform:'scale(.7)',opacity:0},{opacity:.65,offset:.12},{transform:`scale(${2.2+i*.2})`,opacity:0}],{duration:820,delay:i*90,easing:'cubic-bezier(.16,1,.3,1)',fill:'both'}));
+ }
+ for(let i=0;i<20;i++){
+  const particle=document.createElement('span');particle.className='noise-burst-particle'+(i%3===0?' is-ray':'');
+  particle.style.background=['#0864ff','#70aaff','#bdd5ff'][i%3];layer.append(particle);
+  const angle=(i/20*Math.PI*2)-Math.PI/2,start=size*.42,end=size*(.9+(i%4)*.13),rotation=i*18;
+  const position=(r,scale,turn)=>`translate(${Math.cos(angle)*r}px,${Math.sin(angle)*r}px) rotate(${turn}deg) scale(${scale})`;
+  burst.push(particle.animate([{transform:position(start,.35,rotation),opacity:0},{transform:position(start*1.2,1,rotation+20),opacity:1,offset:.13},{transform:position(end,.15,rotation+100),opacity:0}],{duration:660+(i%5)*65,delay:(i%3)*25,easing:'cubic-bezier(.12,.7,.2,1)',fill:'both'}));
+ }
+ burst.push(noiseButton.animate([{transform:'scale(.96)'},{transform:'scale(1.08)',offset:.3},{transform:'scale(1)'}],{duration:620,easing:'cubic-bezier(.16,1,.3,1)',fill:'both'}));
+ noiseScene.classList.add('is-finishing');noiseAnimations.push(...burst);
+ await Promise.all(burst.map(a=>a.finished));
+ layer.remove();noiseScene.classList.remove('is-finishing');
+}
+function scrollToCollectedDemo(target){
+ return new Promise(resolve=>{
+  const start=window.scrollY,padding=parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop)||104;
+  const end=Math.max(0,Math.min(document.documentElement.scrollHeight-innerHeight,start+target.getBoundingClientRect().top-padding));
+  const distance=end-start,duration=Math.min(1250,Math.max(900,Math.abs(distance)*.5));
+  let frame=0,started=null,done=false;
+  function finish(arrived){
+   if(done)return;done=true;cancelAnimationFrame(frame);
+   for(const type of ['wheel','touchstart','pointerdown','resize'])window.removeEventListener(type,interrupt);
+   window.removeEventListener('keydown',keyInterrupt);
+   noiseScrollCancel=null;resolve(arrived);
+  }
+  function interrupt(){finish(false);}
+  function keyInterrupt(e){if(['Escape','ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '].includes(e.key))interrupt();}
+  function tick(now){
+   if(started===null)started=now;
+   const t=Math.min(1,(now-started)/duration),ease=t*t*t*(t*(t*6-15)+10);
+   window.scrollTo({top:start+distance*ease,behavior:'instant'});
+   if(t<1)frame=requestAnimationFrame(tick);else finish(true);
+  }
+  for(const type of ['wheel','touchstart','pointerdown','resize'])window.addEventListener(type,interrupt,{passive:true});
+  window.addEventListener('keydown',keyInterrupt);
+  noiseScrollCancel=interrupt;frame=requestAnimationFrame(tick);
+ });
+}
 async function collectContext(){
  if(noiseBusy)return;
- if(noiseCollected){openCollectedDemo();return;}
+ if(noiseCollected){await openCollectedDemo();return;}
  const generation=++noiseGeneration;
  noiseBusy=true;noiseButton.disabled=true;
  noiseScene.classList.add('is-collecting');noiseScene.setAttribute('aria-busy','true');
@@ -179,36 +226,46 @@ async function collectContext(){
   noiseCollected=true;
   noiseScene.classList.remove('is-collecting');noiseScene.classList.add('is-collected');
   $$('.noise-node',noiseScene).forEach(n=>n.setAttribute('aria-hidden','true'));
-  noiseButton.innerHTML=`<span class="noise-collect-icon">${icon('check')}</span><b>Одна<br>сводка</b><span class="noise-collect-hint">Открываем пример решения ↓</span>`;
+  noiseButton.innerHTML=`<span class="noise-collect-icon">${icon('check')}</span><b>Одна<br>сводка</b><span class="noise-collect-hint">Готово. Переходим к решению ↓</span>`;
   $('#noise-status').textContent='Уточнения собраны. Ниже — готовый пример сводки по четырём операциям.';
-  if(!reducedMotion.matches){const finish=noiseButton.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:260,easing:'ease-out'});noiseAnimations.push(finish);await finish.finished;}
-  if(generation===noiseGeneration&&!$('#main').hidden)openCollectedDemo();
+  if(!reducedMotion.matches)await finishContextBurst();
+  if(generation===noiseGeneration&&!$('#main').hidden)await openCollectedDemo(generation);
  }catch{
-  // A cancelled animation must not navigate after the user leaves the scene.
+  // Cancellation never sends the user to another section after they leave.
  }finally{
-  if(generation===noiseGeneration){noiseBusy=false;noiseButton.disabled=false;noiseScene.removeAttribute('aria-busy');document.body.classList.remove('collecting-context');}
+  if(generation===noiseGeneration)resetNoiseScene();
  }
 }
-function openCollectedDemo(){
+async function openCollectedDemo(generation=noiseGeneration){
+ if(noiseNavigating)return;
+ noiseNavigating=true;
  selectedCase='П-08';activeFilter='all';alternate=false;serviceView='summary';renderService();
  const target=$('#demo');
- if(presenting)showSlide(sections.indexOf(target));
- else target.scrollIntoView({behavior:reducedMotion.matches?'instant':'smooth',block:'start'});
- target.classList.remove('context-arrived');void target.offsetWidth;target.classList.add('context-arrived');
- const title=$('h2',target);title.setAttribute('tabindex','-1');title.focus({preventScroll:true});
- try{history.replaceState(null,'','#demo');}catch{}
+ try{
+  let arrived=true;
+  if(presenting)showSlide(sections.indexOf(target));
+  else if(reducedMotion.matches)target.scrollIntoView({behavior:'instant',block:'start'});
+  else arrived=await scrollToCollectedDemo(target);
+  if(!arrived||generation!==noiseGeneration||$('#main').hidden)return;
+  target.classList.remove('context-arrived');void target.offsetWidth;target.classList.add('context-arrived');
+  const title=$('h2',target);title.setAttribute('tabindex','-1');title.focus({preventScroll:true});
+  try{history.replaceState(null,'','#demo');}catch{}
+ }finally{
+  noiseNavigating=false;
+ }
 }
 noiseButton.addEventListener('click',collectContext);
 if('IntersectionObserver' in window){
  const noiseObserver=new IntersectionObserver(entries=>entries.forEach(e=>{
   noiseScene.classList.toggle('noise-paused',!e.isIntersecting||document.hidden);
-  if(!e.isIntersecting&&(noiseCollected||noiseBusy))resetNoiseScene();
+  if(!e.isIntersecting&&!noiseNavigating&&(noiseCollected||noiseBusy))resetNoiseScene();
  }),{threshold:0});noiseObserver.observe(noiseScene);
 }
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){noiseScene.classList.add('noise-paused');if(noiseBusy)resetNoiseScene();}
  else if(noiseScene.getBoundingClientRect().bottom>0&&noiseScene.getBoundingClientRect().top<innerHeight)noiseScene.classList.remove('noise-paused');
 });
+reducedMotion.addEventListener('change',()=>{if(noiseBusy)resetNoiseScene();});
 
 const prompts={
 extract:`РОЛЬ: извлечение рабочих уточнений для support-отдела.
@@ -282,17 +339,8 @@ $('#download-answer').addEventListener('click',()=>download('russmarket-answer.t
 const internalSections=$$('main > section');
 const commercialSections=$$('#commercial-deck > section');
 let sections=internalSections;let currentSlide=0;let presenting=false;let currentDeck='internal';let deckChanging=false;
-let commercialPalette='cobalt';
-const commercialColors={cobalt:{canvas:'#125bea',accent:'#ffffff'},graphite:{canvas:'#0b0b0d',accent:'#d8ff55'}};
-function setCommercialPalette(key){
-  if(!commercialColors[key])return;
-  commercialPalette=key;
-  document.body.dataset.commercialPalette=key;
-  $$('[data-palette]').forEach(b=>{const active=b.dataset.palette===key;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
-  if(currentDeck==='commercial')$('meta[name="theme-color"]').content=commercialColors[key].canvas;
-}
-$$('[data-palette]').forEach(b=>b.addEventListener('click',()=>setCommercialPalette(b.dataset.palette)));
-setCommercialPalette(commercialPalette);
+const commercialColors={canvas:'#125bea',accent:'#ffffff'};
+document.body.dataset.commercialPalette='cobalt';
 const deckState={internal:{scroll:0,slide:0,presenting:false},commercial:{scroll:0,slide:0,presenting:false}};
 const productEntry=$('#product-entry'),productSlot=$('#product-entry-slot');
 let productFloating=false;
@@ -376,7 +424,7 @@ function activateDeck(target){
   $('.brand').href=commercial?'#commercial-intro':'#intro';
   $('.brand').setAttribute('aria-label',commercial?'Сводка, в начало коммерческой презентации':'Руссмаркет, в начало');
   $('.skip').href=commercial?'#commercial-deck':'#main';
-  $('meta[name="theme-color"]').content=commercial?commercialColors[commercialPalette].canvas:'#ffffff';
+  $('meta[name="theme-color"]').content=commercial?commercialColors.canvas:'#ffffff';
   document.title=commercial?'Сводка / For Teams — коммерческая концепция':'Руссмаркет — из переписки в действия';
   sections=commercial?commercialSections:internalSections;
   if(commercial)deckState.commercial={scroll:0,slide:0,presenting:false};
@@ -402,8 +450,8 @@ async function switchDeck(target,event){
   deckChanging=true;
   document.documentElement.classList.add('deck-transitioning');
   const overlay=$('.deck-transition');
-  overlay.style.background=commercial?(commercialPalette==='cobalt'?'#125bea':commercialColors[commercialPalette].canvas):'#ffffff';
-  overlay.style.color=commercial?(commercialPalette==='cobalt'?'#ffffff':commercialColors[commercialPalette].accent):'#1660e5';
+  overlay.style.background=commercial?commercialColors.canvas:'#ffffff';
+  overlay.style.color=commercial?commercialColors.accent:'#1660e5';
   $('.transition-wordmark').firstChild.textContent=commercial?'СВОДКА':'РУССМАРКЕТ';
   $('.transition-wordmark span').textContent=commercial?'FOR TEAMS':'DIGITAL';
   let switched=false;
