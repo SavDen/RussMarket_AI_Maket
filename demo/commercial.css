@@ -45,8 +45,8 @@
 .pitch-product::before { content:''; position:absolute; width:85px; height:4px; left:23px; top:-2px; border-radius:3px; background:var(--sales-accent); }
 .pitch-product-top { display:flex; align-items:center; gap:13px; }
 .pitch-product-top > b { font-size:17px; }
-.pitch-app-logo { background:var(--sales-accent); color:var(--sales-on-accent); font-weight:900; font-size:23px; width:35px; height:35px; border-radius:9px; display:flex; justify-content:center; align-items:center; position:relative; }
-.pitch-app-logo span { position:absolute; right:1px; top:-6px; font-size:17px; }
+.pitch-app-logo { background:var(--sales-accent);color:var(--sales-on-accent);width:35px;height:35px;flex:0 0 35px;border-radius:9px;display:grid;place-items:center; }
+.pitch-app-logo > .pitch-mark { display:block;width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round; }
 .pitch-time { margin-left:auto; font-size:13px; color:var(--sales-muted); font-variant-numeric:tabular-nums; }
 .pitch-product-status { display:flex; align-items:center; gap:8px; color:var(--sales-muted); font-size:12px; margin:20px 0; }
 .pitch-live { width:6px; height:6px; border-radius:50%; background:var(--sales-accent); }
